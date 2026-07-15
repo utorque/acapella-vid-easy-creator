@@ -12,7 +12,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "test": "vitest run",
     "start": "electron-vite preview",
-    "dist:win": "electron-vite build && electron-builder --win"
+    "dist:win": "electron-vite build && electron-builder --win",
+    "test:e2e": "node scripts/e2e.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",
@@ -22,14 +23,15 @@
     "electron": "^43.1.1",
     "electron-builder": "^26.15.3",
     "electron-vite": "^5.0.0",
+    "playwright-core": "^1.61.1",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
     "typescript": "~5.9.0",
     "vite": "^7.3.6",
     "vitest": "^4.1.10"
   },
   "dependencies": {
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
-    "@ffprobe-installer/ffprobe": "^2.1.2",
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7"
+    "@ffprobe-installer/ffprobe": "^2.1.2"
   }
 }

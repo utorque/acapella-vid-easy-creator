@@ -93,6 +93,9 @@ export async function exportVideo(onProgress: (p: ExportProgress) => void): Prom
     '-pix_fmt', 'yuv420p',
     '-c:a', 'aac',
     '-b:a', '256k',
+    // -shortest overshoots with filter_complex; cap the output at the
+    // soundtrack's length explicitly so the video ends with the music.
+    '-t', originalInfo.durationSec.toFixed(3),
     '-shortest',
     '-movflags', '+faststart',
     outPath
