@@ -1,0 +1,20 @@
+appId: com.utorque.acapella-vid-easy-creator
+productName: A Cappella Video Creator
+directories:
+  buildResources: build
+  output: dist
+files:
+  - out/**
+  - package.json
+asarUnpack:
+  - 'node_modules/@ffmpeg-installer/**'
+  - 'node_modules/@ffprobe-installer/**'
+win:
+  target:
+    - nsis
+nsis:
+  oneClick: true
+  shortcutName: A Cappella Video Creator
+npmRebuild: false
+electronDownload:
+  cache: .electron-cache
