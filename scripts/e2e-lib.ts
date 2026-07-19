@@ -12,6 +12,8 @@ export {
   deleteTake,
   setCrop,
   setQuadrantMapping,
+  setAvOffset,
+  getOriginalAudioInfo,
   readProjectFile
 } from '../src/main/project'
-export { exportVideo } from '../src/main/export'
+export { exportVideo, renderSyncPreview } from '../src/main/export'

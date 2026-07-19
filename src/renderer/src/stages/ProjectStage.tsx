@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { ProjectData } from '@shared/types'
+import { useEffect, useState } from 'react'
+import { AudioInfo, ProjectData } from '@shared/types'
 
 interface Props {
   projectDir: string | null
@@ -12,6 +12,24 @@ export default function ProjectStage({ projectDir, data, onProject, onData }: Pr
   const [name, setName] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [audioInfo, setAudioInfo] = useState<AudioInfo | null>(null)
+
+  useEffect(() => {
+    if (!data?.originalAudio) {
+      setAudioInfo(null)
+      return
+    }
+    let cancelled = false
+    window.api
+      .getAudioInfo()
+      .then((info) => {
+        if (!cancelled) setAudioInfo(info)
+      })
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [data?.originalAudio])
 
   const run = async (fn: () => Promise<void>): Promise<void> => {
     setBusy(true)
@@ -93,6 +111,30 @@ export default function ProjectStage({ projectDir, data, onProject, onData }: Pr
             </button>
             {data.originalAudio && <span className="ok-text mono">✓ {data.originalAudio}</span>}
           </div>
+          {audioInfo && (
+            <p className="hint mono">
+              {audioInfo.codec} · {(audioInfo.sampleRate / 1000).toFixed(1)} kHz ·{' '}
+              {audioInfo.channels === 1 ? 'mono' : 'stereo'}
+              {audioInfo.bitrateKbps > 0 && !audioInfo.lossless
+                ? ` · ${audioInfo.bitrateKbps} kbit/s`
+                : ''}
+              {audioInfo.lossless ? ' · lossless' : ''}
+            </p>
+          )}
+          {audioInfo && !audioInfo.lossless && audioInfo.willCopy && (
+            <p className="hint">
+              This file is already lossy-compressed. It will be placed in the final video
+              byte-for-byte (never re-encoded), so the export sounds exactly like this file — if
+              you hear compression noise in it, export a WAV/FLAC mix instead.
+            </p>
+          )}
+          {audioInfo && !audioInfo.lossless && !audioInfo.willCopy && (
+            <p className="warn-text">
+              This file is lossy-compressed in a format MP4 can't carry, so the export has to
+              re-encode it (quality loss stacks). For best quality import a WAV/FLAC — or MP3/M4A —
+              mix instead.
+            </p>
+          )}
           {data.originalAudio && !data.pickupAudio && (
             <p className="hint">Next: generate the count-in in step 2.</p>
           )}

@@ -1,6 +1,7 @@
 import { promises as fs } from 'fs'
 import path from 'path'
 import {
+  AudioInfo,
   CountInSettings,
   CropRect,
   DEFAULT_QUADRANT_MAPPING,
@@ -8,7 +9,7 @@ import {
   TakeInfo,
   VoicePart
 } from '@shared/types'
-import { probeMedia, runFfmpeg } from './ffmpeg'
+import { canCopyToMp4, isLosslessCodec, probeMedia, runFfmpeg } from './ffmpeg'
 
 const PROJECT_FILE = 'project.json'
 
@@ -150,6 +151,29 @@ export async function deleteTake(voice: VoicePart): Promise<ProjectData> {
     delete data.takes[voice]
     await save()
   }
+  return data
+}
+
+/** ffprobe facts about the imported track, for display and export decisions. */
+export async function getOriginalAudioInfo(): Promise<AudioInfo | null> {
+  const { dir, data } = getCurrent()
+  if (!data.originalAudio) return null
+  const info = await probeMedia(path.join(dir, data.originalAudio))
+  return {
+    codec: info.audioCodec,
+    sampleRate: info.audioSampleRate,
+    channels: info.audioChannels,
+    durationSec: info.durationSec,
+    bitrateKbps: info.audioBitrateKbps,
+    lossless: isLosslessCodec(info.audioCodec),
+    willCopy: canCopyToMp4(info.audioCodec)
+  }
+}
+
+export async function setAvOffset(avOffsetSec: number): Promise<ProjectData> {
+  const { data } = getCurrent()
+  data.avOffsetSec = avOffsetSec
+  await save()
   return data
 }
 

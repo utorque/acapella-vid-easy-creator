@@ -69,6 +69,12 @@ export interface ProjectData {
   takes: Partial<Record<VoicePart, TakeInfo>>
   crop: CropRect | null
   quadrantMapping: Record<Quadrant, VoicePart>
+  /**
+   * Manual A/V sync trim, seconds. Positive values shift all videos earlier
+   * relative to the soundtrack (compensates webcam capture latency, which
+   * delays every take's video by the same amount relative to the guide audio).
+   */
+  avOffsetSec?: number
 }
 
 export interface ProjectHandle {
@@ -96,4 +102,30 @@ export interface OffsetResult {
 export interface ExportResult {
   outPath: string
   offsets: OffsetResult[]
+  /**
+   * How the soundtrack got into the file: 'copied' = the imported track's
+   * bytes are muxed in untouched (no quality change possible); 'encoded' =
+   * lossless source encoded once to AAC 320k.
+   */
+  audioAction: 'copied' | 'encoded'
+  audioCodec: string
+}
+
+export interface PreviewResult {
+  /** Path of the rendered preview, relative to the project folder. */
+  relPath: string
+  offsets: OffsetResult[]
+}
+
+/** Audio stream facts about the imported track, from ffprobe. */
+export interface AudioInfo {
+  codec: string
+  sampleRate: number
+  channels: number
+  durationSec: number
+  /** kbit/s, 0 if unknown (typical for lossless). */
+  bitrateKbps: number
+  lossless: boolean
+  /** Whether the export can mux this stream into MP4 bit-exact (no re-encode). */
+  willCopy: boolean
 }

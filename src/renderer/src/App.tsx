@@ -12,33 +12,45 @@ interface StageDef {
   id: StageId
   label: string
   enabled: (data: ProjectData | null) => boolean
+  /** True once this stage's own work is finished (drives the Next button). */
+  done: (data: ProjectData | null) => boolean
   hint: string
 }
 
 const STAGES: StageDef[] = [
-  { id: 'project', label: '1 · Project', enabled: () => true, hint: '' },
+  {
+    id: 'project',
+    label: '1 · Project',
+    enabled: () => true,
+    done: (d) => !!d?.originalAudio,
+    hint: ''
+  },
   {
     id: 'pickup',
     label: '2 · Count-in',
     enabled: (d) => !!d?.originalAudio,
+    done: (d) => !!d?.pickupAudio,
     hint: 'Import the mixed track first'
   },
   {
     id: 'capture',
     label: '3 · Capture',
     enabled: (d) => !!d?.pickupAudio,
+    done: (d) => !!d && VOICE_PARTS.every((v) => !!d.takes[v]),
     hint: 'Generate the count-in first'
   },
   {
     id: 'crop',
     label: '4 · Crop',
     enabled: (d) => !!d && Object.keys(d.takes).length > 0,
+    done: (d) => !!d?.crop,
     hint: 'Record at least one take first'
   },
   {
     id: 'export',
     label: '5 · Export',
     enabled: (d) => !!d && !!d.crop && VOICE_PARTS.every((v) => !!d.takes[v]),
+    done: () => false,
     hint: 'Record all four parts and set the crop first'
   }
 ]
@@ -49,6 +61,11 @@ export default function App(): React.JSX.Element {
   const [stage, setStage] = useState<StageId>('project')
 
   const stageDefs = useMemo(() => STAGES, [])
+
+  const stageIndex = stageDefs.findIndex((s) => s.id === stage)
+  const current = stageDefs[stageIndex]
+  const next = stageDefs[stageIndex + 1]
+  const showNext = !!next && current.done(data) && next.enabled(data)
 
   return (
     <div className="app">
@@ -90,6 +107,11 @@ export default function App(): React.JSX.Element {
         {stage === 'capture' && data && <CaptureStage data={data} onData={setData} />}
         {stage === 'crop' && data && <CropStage data={data} onData={setData} />}
         {stage === 'export' && data && <ExportStage data={data} onData={setData} />}
+        {showNext && (
+          <button className="next-fab" onClick={() => setStage(next.id)}>
+            Next: {next.label} →
+          </button>
+        )}
       </main>
     </div>
   )

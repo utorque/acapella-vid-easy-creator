@@ -118,6 +118,15 @@ await page.exposeFunction('__api_setQuadrantMapping', async (m) => lib.setQuadra
 await page.exposeFunction('__api_exportVideo', async () => {
   return lib.exportVideo((p) => console.log(`[export] ${p.phase} ${(p.progress * 100).toFixed(0)}% ${p.message}`))
 })
+await page.exposeFunction('__api_setAvOffset', async (sec) => lib.setAvOffset(sec))
+await page.exposeFunction('__api_getAudioInfo', async () => lib.getOriginalAudioInfo())
+await page.exposeFunction('__api_renderSyncPreview', async (startSec, durationSec) => {
+  return lib.renderSyncPreview(
+    (p) => console.log(`[preview] ${p.phase} ${(p.progress * 100).toFixed(0)}% ${p.message}`),
+    startSec,
+    durationSec
+  )
+})
 
 await page.addInitScript(() => {
   const u8ToB64 = (u8) => {
@@ -145,7 +154,10 @@ await page.addInitScript(() => {
     deleteTake: (voice) => window.__api_deleteTake(voice),
     setCrop: (crop) => window.__api_setCrop(crop),
     setQuadrantMapping: (m) => window.__api_setQuadrantMapping(m),
+    setAvOffset: (sec) => window.__api_setAvOffset(sec),
+    getAudioInfo: () => window.__api_getAudioInfo(),
     exportVideo: () => window.__api_exportVideo(),
+    renderSyncPreview: (startSec, durationSec) => window.__api_renderSyncPreview(startSec, durationSec),
     onExportProgress: () => () => {},
     showItemInFolder: () => Promise.resolve()
   }

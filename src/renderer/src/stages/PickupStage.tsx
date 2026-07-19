@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ProjectData } from '@shared/types'
 import {
   audioBufferToWav,
+  COUNT_IN_FILE_RATE,
   countInDurationSec,
   previewCountIn,
   PreviewHandle,
@@ -56,7 +57,9 @@ export default function PickupStage({ data, onData }: Props): React.JSX.Element 
       const ctx = getCtx()
       if (ctx.state !== 'running') await ctx.resume()
       const track = await loadTrack()
-      const countIn = await renderCountIn(bpm, beats)
+      // Render at the playback context's rate — a rate mismatch would make
+      // AudioBufferSourceNode linear-resample, which adds audible aliasing.
+      const countIn = await renderCountIn(bpm, beats, ctx.sampleRate)
       stopPreview()
       setPreviewing(true)
       previewRef.current = previewCountIn(ctx, countIn, track, 8, () => setPreviewing(false))
@@ -71,7 +74,7 @@ export default function PickupStage({ data, onData }: Props): React.JSX.Element 
     setError(null)
     stopPreview()
     try {
-      const countIn = await renderCountIn(bpm, beats)
+      const countIn = await renderCountIn(bpm, beats, COUNT_IN_FILE_RATE)
       const wav = audioBufferToWav(countIn)
       const updated = await window.api.acceptCountIn(wav, {
         bpm,
