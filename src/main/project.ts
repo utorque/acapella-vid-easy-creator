@@ -2,6 +2,7 @@ import { promises as fs } from 'fs'
 import path from 'path'
 import {
   AudioInfo,
+  ColorCorrection,
   CountInSettings,
   CropRect,
   DEFAULT_QUADRANT_MAPPING,
@@ -73,7 +74,8 @@ export async function createProject(parentDir: string, name: string): Promise<{ 
     takes: {},
     voiceAudio: {},
     crop: null,
-    quadrantMapping: { ...DEFAULT_QUADRANT_MAPPING }
+    quadrantMapping: { ...DEFAULT_QUADRANT_MAPPING },
+    colorCorrection: null
   }
   currentDir = dir
   currentData = data
@@ -86,6 +88,7 @@ export async function openProject(dir: string): Promise<{ dir: string; data: Pro
   const data = JSON.parse(raw) as ProjectData
   if (data.version !== 1) throw new Error(`Unsupported project version: ${data.version}`)
   if (!data.voiceAudio) data.voiceAudio = {}
+  if (data.colorCorrection === undefined) data.colorCorrection = null
   currentDir = dir
   currentData = data
   return { dir, data }
@@ -273,6 +276,13 @@ export async function setCrop(crop: CropRect): Promise<ProjectData> {
 export async function setQuadrantMapping(mapping: ProjectData['quadrantMapping']): Promise<ProjectData> {
   const { data } = getCurrent()
   data.quadrantMapping = mapping
+  await save()
+  return data
+}
+
+export async function setColorCorrection(correction: ColorCorrection | null): Promise<ProjectData> {
+  const { data } = getCurrent()
+  data.colorCorrection = correction
   await save()
   return data
 }

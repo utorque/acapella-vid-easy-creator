@@ -378,6 +378,53 @@ label.field {
   cursor: nwse-resize;
 }
 
+/* Color stage */
+.stage-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.color-compare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.color-compare-label {
+  color: var(--text-dim);
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+
+.color-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.color-cell {
+  aspect-ratio: 1;
+  background: #000;
+}
+
+.color-cell img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.color-cell-empty {
+  width: 100%;
+  height: 100%;
+}
+
 /* Export stage */
 .quad-grid {
   display: grid;

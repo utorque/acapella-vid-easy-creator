@@ -63,6 +63,42 @@ export interface CropRect {
   size: number
 }
 
+/** One point on a take's color-correction curve. */
+export interface ColorKeyframe {
+  /** Time within this take's own file, seconds (matches the ffmpeg -ss trim math). */
+  fileTimeSec: number
+  gammaR: number
+  gammaG: number
+  gammaB: number
+}
+
+export interface ColorCorrection {
+  status: 'applied' | 'skipped'
+  /** Hash of crop+takes+quadrantMapping+avOffset; stale once it no longer matches. */
+  sourceKey: string
+  perVoice: Partial<Record<VoicePart, ColorKeyframe[]>>
+}
+
+/** Mean color sampled from one take's crop region at one timeline point. */
+export interface ColorSampleMean {
+  r: number
+  g: number
+  b: number
+}
+
+/** One review point: same instant across all four takes, before and after correction. */
+export interface ColorPreviewSample {
+  /** Position on the shared/final timeline, seconds. */
+  tSec: number
+  before: Partial<Record<VoicePart, string>>
+  after: Partial<Record<VoicePart, string>>
+}
+
+export interface ColorAnalysisResult {
+  correction: ColorCorrection
+  samples: ColorPreviewSample[]
+}
+
 export interface ProjectData {
   version: 1
   name: string
@@ -86,6 +122,7 @@ export interface ProjectData {
    * delays every take's video by the same amount relative to the guide audio).
    */
   avOffsetSec?: number
+  colorCorrection: ColorCorrection | null
 }
 
 export interface ProjectHandle {

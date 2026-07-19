@@ -1,6 +1,8 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type {
   AudioInfo,
+  ColorAnalysisResult,
+  ColorCorrection,
   CountInSettings,
   CropRect,
   ExportProgress,
@@ -46,6 +48,15 @@ const api = {
     const listener = (_e: Electron.IpcRendererEvent, p: ExportProgress): void => cb(p)
     ipcRenderer.on('export:progress', listener)
     return () => ipcRenderer.removeListener('export:progress', listener)
+  },
+  analyzeColor: (): Promise<ColorAnalysisResult> => ipcRenderer.invoke('project:colorAnalyze'),
+  applyColorCorrection: (correction: ColorCorrection): Promise<ProjectData> =>
+    ipcRenderer.invoke('project:colorApply', correction),
+  skipColorCorrection: (): Promise<ProjectData> => ipcRenderer.invoke('project:colorSkip'),
+  onColorProgress: (cb: (p: ExportProgress) => void): (() => void) => {
+    const listener = (_e: Electron.IpcRendererEvent, p: ExportProgress): void => cb(p)
+    ipcRenderer.on('color:progress', listener)
+    return () => ipcRenderer.removeListener('color:progress', listener)
   },
   showItemInFolder: (filePath: string): Promise<void> =>
     ipcRenderer.invoke('shell:showItem', filePath)
