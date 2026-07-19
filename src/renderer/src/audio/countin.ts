@@ -1,15 +1,24 @@
-const SAMPLE_RATE = 44100
+export const COUNT_IN_FILE_RATE = 44100
 
 /**
  * Synthesize the count-in click pattern: `beats` clicks at `bpm`, the first
  * beat accented (higher pitch). The buffer duration is exactly
  * beats * 60 / bpm seconds, so the track spliced right after it starts on
  * the beat following the last click.
+ *
+ * `sampleRate` must match the context the buffer will be played in: Chromium
+ * resamples AudioBufferSourceNode playback by linear interpolation, which
+ * audibly sprays aliasing noise (measured ~-40 dBFS spurs for a 44.1k buffer
+ * in a 48k context).
  */
-export async function renderCountIn(bpm: number, beats: number): Promise<AudioBuffer> {
+export async function renderCountIn(
+  bpm: number,
+  beats: number,
+  sampleRate: number
+): Promise<AudioBuffer> {
   const beatSec = 60 / bpm
   const durationSec = beats * beatSec
-  const ctx = new OfflineAudioContext(1, Math.round(durationSec * SAMPLE_RATE), SAMPLE_RATE)
+  const ctx = new OfflineAudioContext(1, Math.round(durationSec * sampleRate), sampleRate)
 
   for (let i = 0; i < beats; i++) {
     const t = i * beatSec

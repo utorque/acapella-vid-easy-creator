@@ -90,10 +90,35 @@ export function decodePcm(
   })
 }
 
+/**
+ * Codecs that can be muxed into MP4 as-is. For these the export soundtrack is
+ * stream-copied — the bytes in final.mp4 are identical to the imported file,
+ * so no quality loss is possible at export.
+ */
+const MP4_COPY_CODECS = new Set(['aac', 'mp3', 'alac'])
+
+const LOSSLESS_CODECS = new Set([
+  'pcm_s16le', 'pcm_s24le', 'pcm_s32le', 'pcm_f32le', 'pcm_f64le',
+  'flac', 'alac', 'wavpack'
+])
+
+export function canCopyToMp4(codec: string): boolean {
+  return MP4_COPY_CODECS.has(codec)
+}
+
+export function isLosslessCodec(codec: string): boolean {
+  return LOSSLESS_CODECS.has(codec)
+}
+
 export interface MediaInfo {
   durationSec: number
   width: number
   height: number
+  audioCodec: string
+  audioSampleRate: number
+  audioChannels: number
+  /** kbit/s of the audio stream, 0 if unknown. */
+  audioBitrateKbps: number
 }
 
 export function probeMedia(inputPath: string): Promise<MediaInfo> {
@@ -109,18 +134,25 @@ export function probeMedia(inputPath: string): Promise<MediaInfo> {
         }
         try {
           const info = JSON.parse(stdout)
-          const video = (info.streams ?? []).find((s: { codec_type: string }) => s.codec_type === 'video')
+          const streams = info.streams ?? []
+          const video = streams.find((s: { codec_type: string }) => s.codec_type === 'video')
+          const audio = streams.find((s: { codec_type: string }) => s.codec_type === 'audio')
           let durationSec = Number(info.format?.duration ?? 0)
           if (!durationSec || Number.isNaN(durationSec)) {
-            const streamDur = (info.streams ?? [])
+            const streamDur = streams
               .map((s: { duration?: string }) => Number(s.duration ?? 0))
               .filter((d: number) => d > 0)
             durationSec = streamDur.length ? Math.max(...streamDur) : 0
           }
+          const audioBitrate = Number(audio?.bit_rate ?? 0) || Number(info.format?.bit_rate ?? 0)
           resolve({
             durationSec,
             width: video ? Number(video.width) : 0,
-            height: video ? Number(video.height) : 0
+            height: video ? Number(video.height) : 0,
+            audioCodec: audio ? String(audio.codec_name ?? '') : '',
+            audioSampleRate: audio ? Number(audio.sample_rate ?? 0) : 0,
+            audioChannels: audio ? Number(audio.channels ?? 0) : 0,
+            audioBitrateKbps: audio ? Math.round(audioBitrate / 1000) : 0
           })
         } catch (e) {
           reject(e)

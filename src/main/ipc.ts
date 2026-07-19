@@ -2,7 +2,7 @@ import { BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import path from 'path'
 import { CountInSettings, CropRect, ProjectData, VoicePart } from '@shared/types'
 import * as project from './project'
-import { exportVideo } from './export'
+import { exportVideo, renderSyncPreview } from './export'
 
 function windowOf(event: Electron.IpcMainInvokeEvent): BrowserWindow | null {
   return BrowserWindow.fromWebContents(event.sender)
@@ -81,12 +81,34 @@ export function registerIpcHandlers(): void {
     }
   )
 
+  ipcMain.handle('project:setAvOffset', async (_event, avOffsetSec: number) => {
+    return project.setAvOffset(avOffsetSec)
+  })
+
+  ipcMain.handle('project:audioInfo', async () => {
+    return project.getOriginalAudioInfo()
+  })
+
   ipcMain.handle('project:export', async (event) => {
     const win = windowOf(event)
     return exportVideo((p) => {
       win?.webContents.send('export:progress', p)
     })
   })
+
+  ipcMain.handle(
+    'project:renderPreview',
+    async (event, startSec: number, durationSec: number) => {
+      const win = windowOf(event)
+      return renderSyncPreview(
+        (p) => {
+          win?.webContents.send('export:progress', p)
+        },
+        startSec,
+        durationSec
+      )
+    }
+  )
 
   ipcMain.handle('shell:showItem', async (_event, filePath: string) => {
     shell.showItemInFolder(filePath)

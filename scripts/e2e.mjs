@@ -118,6 +118,15 @@ await page.exposeFunction('__api_setQuadrantMapping', async (m) => lib.setQuadra
 await page.exposeFunction('__api_exportVideo', async () => {
   return lib.exportVideo((p) => console.log(`[export] ${p.phase} ${(p.progress * 100).toFixed(0)}% ${p.message}`))
 })
+await page.exposeFunction('__api_setAvOffset', async (sec) => lib.setAvOffset(sec))
+await page.exposeFunction('__api_getAudioInfo', async () => lib.getOriginalAudioInfo())
+await page.exposeFunction('__api_renderSyncPreview', async (startSec, durationSec) => {
+  return lib.renderSyncPreview(
+    (p) => console.log(`[preview] ${p.phase} ${(p.progress * 100).toFixed(0)}% ${p.message}`),
+    startSec,
+    durationSec
+  )
+})
 
 await page.addInitScript(() => {
   const u8ToB64 = (u8) => {
@@ -145,7 +154,10 @@ await page.addInitScript(() => {
     deleteTake: (voice) => window.__api_deleteTake(voice),
     setCrop: (crop) => window.__api_setCrop(crop),
     setQuadrantMapping: (m) => window.__api_setQuadrantMapping(m),
+    setAvOffset: (sec) => window.__api_setAvOffset(sec),
+    getAudioInfo: () => window.__api_getAudioInfo(),
     exportVideo: () => window.__api_exportVideo(),
+    renderSyncPreview: (startSec, durationSec) => window.__api_renderSyncPreview(startSec, durationSec),
     onExportProgress: () => () => {},
     showItemInFolder: () => Promise.resolve()
   }
@@ -167,15 +179,15 @@ await page.getByText('✓ audio/original.wav').waitFor()
 await shot('1-project')
 console.log('Track imported')
 
-// --- Stage 2: count-in ---------------------------------------------------
-await page.getByRole('button', { name: '2 · Count-in' }).click()
+// --- Stage 2: count-in (via the Next button) -----------------------------
+await page.getByRole('button', { name: 'Next: 2 · Count-in →' }).click()
 await page.getByRole('button', { name: 'Accept — generate pickup track' }).click()
 await page.getByText('✓ Pickup track generated').waitFor()
 await shot('2-countin')
 console.log('Pickup track generated')
 
-// --- Stage 3: capture all four voices -----------------------------------
-await page.getByRole('button', { name: '3 · Capture' }).click()
+// --- Stage 3: capture all four voices (via the Next button) --------------
+await page.getByRole('button', { name: 'Next: 3 · Capture →' }).click()
 for (const voice of VOICES) {
   await page.locator('.voice-item', { hasText: voice }).click()
   await page.getByRole('button', { name: `● Record ${voice}` }).click()
@@ -189,16 +201,23 @@ for (const voice of VOICES) {
 }
 await shot('3-capture-done')
 
-// --- Stage 4: crop -------------------------------------------------------
-await page.getByRole('button', { name: '4 · Crop' }).click()
+// --- Stage 4: crop (via the Next button) ---------------------------------
+await page.getByRole('button', { name: 'Next: 4 · Crop →' }).click()
 await page.locator('.crop-box').waitFor()
 await page.getByRole('button', { name: 'Save crop' }).click()
 await page.getByText('✓ Saved').waitFor()
 await shot('4-crop')
 console.log('Crop saved')
 
-// --- Stage 5: export -----------------------------------------------------
-await page.getByRole('button', { name: '5 · Export' }).click()
+// --- Stage 5: export (via the Next button) -------------------------------
+await page.getByRole('button', { name: 'Next: 5 · Export →' }).click()
+
+// Sync preview: rendered through the same pipeline as the export.
+await page.getByRole('button', { name: /Render 8 s sync preview/ }).click()
+await page.locator('.preview-frame video').waitFor({ timeout: 120000 })
+await shot('5-preview')
+console.log('Sync preview rendered')
+
 await page.getByRole('button', { name: 'Export final video' }).click()
 await page.getByText('✓ Exported:').waitFor({ timeout: 180000 })
 await shot('5-export')
@@ -213,6 +232,8 @@ server.close()
 // --- Verify the exported file -------------------------------------------
 const outPath = path.join(projectParent, 'e2e-test', 'export', 'final.mp4')
 if (!existsSync(outPath)) throw new Error(`Export missing: ${outPath}`)
+const previewPath = path.join(projectParent, 'e2e-test', 'export', 'preview.mp4')
+if (!existsSync(previewPath)) throw new Error(`Preview missing: ${previewPath}`)
 const probe = JSON.parse(
   execFileSync(ffprobePath, [
     '-v', 'error', '-show_format', '-show_streams', '-of', 'json', outPath

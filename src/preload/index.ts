@@ -1,9 +1,11 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type {
+  AudioInfo,
   CountInSettings,
   CropRect,
   ExportProgress,
   ExportResult,
+  PreviewResult,
   ProjectData,
   ProjectHandle,
   VoicePart
@@ -27,7 +29,12 @@ const api = {
   setCrop: (crop: CropRect): Promise<ProjectData> => ipcRenderer.invoke('project:setCrop', crop),
   setQuadrantMapping: (mapping: ProjectData['quadrantMapping']): Promise<ProjectData> =>
     ipcRenderer.invoke('project:setQuadrantMapping', mapping),
+  setAvOffset: (avOffsetSec: number): Promise<ProjectData> =>
+    ipcRenderer.invoke('project:setAvOffset', avOffsetSec),
+  getAudioInfo: (): Promise<AudioInfo | null> => ipcRenderer.invoke('project:audioInfo'),
   exportVideo: (): Promise<ExportResult> => ipcRenderer.invoke('project:export'),
+  renderSyncPreview: (startSec: number, durationSec: number): Promise<PreviewResult> =>
+    ipcRenderer.invoke('project:renderPreview', startSec, durationSec),
   onExportProgress: (cb: (p: ExportProgress) => void): (() => void) => {
     const listener = (_e: Electron.IpcRendererEvent, p: ExportProgress): void => cb(p)
     ipcRenderer.on('export:progress', listener)

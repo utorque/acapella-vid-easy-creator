@@ -17,8 +17,11 @@ Audio preparation and mixing happen outside the app; you import one final mixed 
    parts. **Wear headphones** so the guide doesn't bleed into your microphone.
 4. **Crop** — position one square crop (drag to move, corner handle or scroll wheel to resize);
    it is applied identically to all four takes.
-5. **Export** — choose the voice-to-quadrant layout and export. The app aligns all four takes,
-   builds a 1080×1080 2×2 grid, mutes all camera audio, and lays in the clean mixed track.
+5. **Export** — choose the voice-to-quadrant layout, check lip sync with the built-in preview
+   (rendered by the same pipeline as the export), nudge the video-timing slider if needed, and
+   export. The app aligns all four takes, builds a 1080×1080 2×2 grid, mutes all camera audio,
+   and lays in the clean mixed track — stream-copied bit-exact when the imported file is
+   MP4-compatible (mp3/aac/alac), encoded once to AAC 320k otherwise.
 
 ## How synchronization works
 
@@ -39,6 +42,15 @@ construction rather than by trusting timers:
    message instead of producing an out-of-sync video.
 
 The per-take offsets and confidences are displayed after each export.
+
+One thing correlation cannot see is **webcam capture latency**: the camera delivers each frame
+some tens to hundreds of milliseconds after the light hit the sensor, and MediaRecorder
+timestamps frames on arrival. Since every take uses the same camera, all four videos stay
+perfectly synced to each other but can lag the soundtrack by a constant amount. The Export
+stage therefore has a **video timing slider** plus a **sync preview**: an 8-second window
+rendered through the exact same pipeline as the final export (same detected offsets, same trim
+arithmetic, same ffmpeg graph) at low resolution, so what the preview shows is what the export
+produces. Adjust, re-render, export.
 
 ## Project folder layout
 
