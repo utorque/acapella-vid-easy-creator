@@ -10,11 +10,17 @@ Audio preparation and mixing happen outside the app; you import one final mixed 
 ## Workflow
 
 1. **Project** — create a project (a dedicated folder on disk) and import the mixed track.
+   Optionally, drop in the four individual voice stems too (name each file with "ten", "lead",
+   "bari" or "bass"; each must match the mixed track's length) to enable the per-voice waveform
+   in Capture.
 2. **Count-in** — pick tempo and number of clicks, preview it against the track, accept. The app
    renders `audio/pickup.wav` = count-in + track for capture; the clean original stays untouched.
 3. **Capture** — select a voice part, watch the live webcam preview, hit record. Recording and
    guide playback start together; review each take and accept or re-record. Repeat for all four
-   parts. **Wear headphones** so the guide doesn't bleed into your microphone.
+   parts. **Wear headphones** so the guide doesn't bleed into your microphone. If a reference
+   track was uploaded for the selected voice, its waveform is shown above the preview with a
+   playhead synced to the guide, and a slider lets you blend a bit of your own part into the
+   monitor mix (default 75% mix / 25% voice).
 4. **Crop** — position one square crop (drag to move, corner handle or scroll wheel to resize);
    it is applied identically to all four takes.
 5. **Export** — choose the voice-to-quadrant layout, check lip sync with the built-in preview
@@ -60,6 +66,7 @@ produces. Adjust, re-render, export.
   audio/original.*      # imported mixed track (untouched)
   audio/countin.wav     # rendered count-in
   audio/pickup.wav      # count-in + track, used during capture
+  audio/voice-{tenor,lead,baritone,bass}.*  # optional per-voice reference tracks
   takes/{tenor,lead,baritone,bass}.webm
   export/final.mp4
 ```

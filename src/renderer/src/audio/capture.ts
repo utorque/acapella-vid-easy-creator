@@ -20,6 +20,8 @@ export interface RecordingHandle {
   /** Stop everything without producing a take (user cancelled). */
   cancel: () => void
   readonly guideDurationSec: number
+  /** AudioContext-clock time at which guide playback started (for UI sync). */
+  readonly guideStartCtxTime: number
 }
 
 export interface TakeRecording {
@@ -47,8 +49,16 @@ export async function startTakeRecording(opts: {
   micStream: MediaStream
   guideBuffer: AudioBuffer
   onGuideEnded?: () => void
+  /** Per-voice reference track, played only into the monitor (not recorded). */
+  voiceBuffer?: AudioBuffer
+  /** Seconds after guide start at which the voice reference begins (count-in duration). */
+  voiceStartOffsetSec?: number
+  /** 0..1 share of the monitor mix given to the voice reference, rest goes to the full mix. */
+  voiceRatio?: number
 }): Promise<RecordingHandle> {
-  const { ctx, videoTrack, micStream, guideBuffer, onGuideEnded } = opts
+  const { ctx, videoTrack, micStream, guideBuffer, onGuideEnded, voiceBuffer } = opts
+  const voiceStartOffsetSec = opts.voiceStartOffsetSec ?? 0
+  const voiceRatio = voiceBuffer ? (opts.voiceRatio ?? 0) : 0
   if (ctx.state !== 'running') await ctx.resume()
 
   // Audio graph: guide -> left, mic -> right, merged into the recorded track.
@@ -65,8 +75,22 @@ export async function startTakeRecording(opts: {
   guideMono.channelInterpretation = 'speakers'
   guideSrc.connect(guideMono)
   guideMono.connect(merger, 0, 0)
-  // The singer hears the guide on speakers/headphones.
-  guideSrc.connect(ctx.destination)
+  // The singer hears the guide (and optionally their own voice on top) on
+  // speakers/headphones — this monitor path is independent of the recorded mix.
+  const guideMonitorGain = ctx.createGain()
+  guideMonitorGain.gain.value = 1 - voiceRatio
+  guideSrc.connect(guideMonitorGain)
+  guideMonitorGain.connect(ctx.destination)
+
+  let voiceSrc: AudioBufferSourceNode | null = null
+  if (voiceBuffer && voiceRatio > 0) {
+    voiceSrc = ctx.createBufferSource()
+    voiceSrc.buffer = voiceBuffer
+    const voiceMonitorGain = ctx.createGain()
+    voiceMonitorGain.gain.value = voiceRatio
+    voiceSrc.connect(voiceMonitorGain)
+    voiceMonitorGain.connect(ctx.destination)
+  }
 
   const micSrc = ctx.createMediaStreamSource(micStream)
   const micMono = ctx.createGain()
@@ -99,6 +123,7 @@ export async function startTakeRecording(opts: {
   guideSrc.start(guideStartCtxTime)
   guideSrc.onended = () => onGuideEnded?.()
   const scheduledOffsetSec = guideStartCtxTime - recorderStartCtxTime
+  voiceSrc?.start(guideStartCtxTime + voiceStartOffsetSec)
 
   const teardown = (): void => {
     try {
@@ -107,13 +132,20 @@ export async function startTakeRecording(opts: {
     } catch {
       // already stopped
     }
+    try {
+      voiceSrc?.stop()
+    } catch {
+      // already stopped
+    }
     guideSrc.disconnect()
+    voiceSrc?.disconnect()
     micSrc.disconnect()
     merger.disconnect()
   }
 
   return {
     guideDurationSec: guideBuffer.duration,
+    guideStartCtxTime,
     stop: () =>
       new Promise<TakeRecording>((resolve, reject) => {
         recorder.onstop = () => {

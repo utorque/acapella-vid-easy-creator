@@ -36,8 +36,10 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('project:importAudio', async (event) => {
     const win = windowOf(event)
+    const { dir } = project.getCurrent()
     const result = await dialog.showOpenDialog(win!, {
       title: 'Import the final mixed audio track',
+      defaultPath: dir,
       properties: ['openFile'],
       filters: [
         { name: 'Audio', extensions: ['wav', 'mp3', 'm4a', 'aac', 'flac', 'ogg', 'opus', 'aiff'] },
@@ -46,6 +48,30 @@ export function registerIpcHandlers(): void {
     })
     if (result.canceled || result.filePaths.length === 0) return null
     return project.importAudio(result.filePaths[0])
+  })
+
+  ipcMain.handle('project:importVoiceAudioDialog', async (event) => {
+    const win = windowOf(event)
+    const { dir } = project.getCurrent()
+    const result = await dialog.showOpenDialog(win!, {
+      title: 'Import per-voice reference audio (name files with ten/lead/bari/bass)',
+      defaultPath: dir,
+      properties: ['openFile', 'multiSelections'],
+      filters: [
+        { name: 'Audio', extensions: ['wav', 'mp3', 'm4a', 'aac', 'flac', 'ogg', 'opus', 'aiff'] },
+        { name: 'All files', extensions: ['*'] }
+      ]
+    })
+    if (result.canceled || result.filePaths.length === 0) return null
+    return project.importVoiceAudioFiles(result.filePaths)
+  })
+
+  ipcMain.handle('project:importVoiceAudioPaths', async (_event, paths: string[]) => {
+    return project.importVoiceAudioFiles(paths)
+  })
+
+  ipcMain.handle('project:deleteVoiceAudio', async (_event, voice: VoicePart) => {
+    return project.deleteVoiceAudio(voice)
   })
 
   ipcMain.handle('project:readFile', async (_event, relPath: string) => {

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   AudioInfo,
+  DEFAULT_AV_OFFSET_SEC,
   ExportProgress,
   ExportResult,
   ProjectData,
@@ -25,7 +26,9 @@ export default function ExportStage({ data, onData }: Props): React.JSX.Element 
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [audioInfo, setAudioInfo] = useState<AudioInfo | null>(null)
-  const [offsetMs, setOffsetMs] = useState(Math.round((data.avOffsetSec ?? 0) * 1000))
+  const [offsetMs, setOffsetMs] = useState(
+    Math.round((data.avOffsetSec ?? DEFAULT_AV_OFFSET_SEC) * 1000)
+  )
   const [previewStart, setPreviewStart] = useState(30)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [previewStale, setPreviewStale] = useState(false)
