@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ProjectData, VOICE_LABELS, VOICE_PARTS, VoicePart } from '@shared/types'
+import {
+  DEFAULT_VOICE_MONITOR_RATIO,
+  ProjectData,
+  VOICE_LABELS,
+  VOICE_PARTS,
+  VoicePart
+} from '@shared/types'
 import { RecordingHandle, startTakeRecording, TakeRecording } from '../audio/capture'
+import VoiceWaveform from '../components/VoiceWaveform'
 import { formatSeconds, readProjectAudioBuffer } from '../util'
 
 interface Props {
@@ -22,14 +29,21 @@ export default function CaptureStage({ data, onData }: Props): React.JSX.Element
   const [busy, setBusy] = useState(false)
   const [elapsed, setElapsed] = useState(0)
   const [reviewUrl, setReviewUrl] = useState<string | null>(null)
+  const [voiceBuffer, setVoiceBuffer] = useState<AudioBuffer | null>(null)
+  const [voiceProgress, setVoiceProgress] = useState<number | null>(null)
+  const [voiceRatio, setVoiceRatio] = useState(Math.round(DEFAULT_VOICE_MONITOR_RATIO * 100))
 
   const previewVideoRef = useRef<HTMLVideoElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const ctxRef = useRef<AudioContext | null>(null)
   const pickupBufferRef = useRef<AudioBuffer | null>(null)
+  const voiceBuffersRef = useRef<Partial<Record<VoicePart, AudioBuffer>>>({})
+  const guideStartRef = useRef(0)
   const recordingRef = useRef<RecordingHandle | null>(null)
   const takeRef = useRef<TakeRecording | null>(null)
   const timerRef = useRef<number | null>(null)
+
+  const hasAnyVoiceAudio = Object.keys(data.voiceAudio ?? {}).length > 0
 
   const stopStream = useCallback((): void => {
     streamRef.current?.getTracks().forEach((t) => t.stop())
@@ -98,6 +112,54 @@ export default function CaptureStage({ data, onData }: Props): React.JSX.Element
     return ctxRef.current
   }
 
+  // Load (and cache) the reference track for the currently selected voice, if any.
+  useEffect(() => {
+    let cancelled = false
+    const rel = data.voiceAudio?.[voice]
+    if (!rel) {
+      setVoiceBuffer(null)
+      return
+    }
+    const cached = voiceBuffersRef.current[voice]
+    if (cached) {
+      setVoiceBuffer(cached)
+      return
+    }
+    readProjectAudioBuffer(getCtx(), rel)
+      .then((buf) => {
+        if (cancelled) return
+        voiceBuffersRef.current[voice] = buf
+        setVoiceBuffer(buf)
+      })
+      .catch(() => {
+        if (!cancelled) setVoiceBuffer(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [voice, data.voiceAudio])
+
+  // Track the voice waveform playhead in exact sync with the guide playback.
+  useEffect(() => {
+    if (mode !== 'recording' || !voiceBuffer) {
+      setVoiceProgress(null)
+      return
+    }
+    const ctx = ctxRef.current
+    const voiceStartCtxTime = guideStartRef.current + (data.countIn?.durationSec ?? 0)
+    let raf = 0
+    const tick = (): void => {
+      if (ctx) {
+        const elapsed = ctx.currentTime - voiceStartCtxTime
+        const frac = voiceBuffer.duration > 0 ? elapsed / voiceBuffer.duration : 0
+        setVoiceProgress(Math.min(1, Math.max(0, frac)))
+      }
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [mode, voiceBuffer, data.countIn])
+
   const loadPickup = async (): Promise<AudioBuffer> => {
     if (!data.pickupAudio) throw new Error('No pickup track — generate the count-in first')
     if (!pickupBufferRef.current) {
@@ -143,9 +205,13 @@ export default function CaptureStage({ data, onData }: Props): React.JSX.Element
         onGuideEnded: () => {
           // Track finished — stop automatically a moment later.
           window.setTimeout(() => stopRecording(), 500)
-        }
+        },
+        voiceBuffer: voiceBuffer ?? undefined,
+        voiceStartOffsetSec: data.countIn?.durationSec ?? 0,
+        voiceRatio: voiceRatio / 100
       })
       recordingRef.current = rec
+      guideStartRef.current = rec.guideStartCtxTime
       setElapsed(0)
       const startedAt = Date.now()
       timerRef.current = window.setInterval(
@@ -204,6 +270,36 @@ export default function CaptureStage({ data, onData }: Props): React.JSX.Element
       </p>
       <div className="capture-layout">
         <div>
+          {hasAnyVoiceAudio && (
+            <div className="card voice-viz">
+              <div className="row spread">
+                <h2>Your part: {VOICE_LABELS[voice]}</h2>
+                {voiceBuffer && (
+                  <label className="field voice-ratio">
+                    Play voice on top
+                    <span className="row">
+                      <input
+                        type="range"
+                        min={0}
+                        max={100}
+                        step={5}
+                        value={voiceRatio}
+                        onChange={(e) => setVoiceRatio(Number(e.target.value))}
+                      />
+                      <span className="hint mono">
+                        {100 - voiceRatio}% mix / {voiceRatio}% voice
+                      </span>
+                    </span>
+                  </label>
+                )}
+              </div>
+              {voiceBuffer ? (
+                <VoiceWaveform buffer={voiceBuffer} progress={voiceProgress} />
+              ) : (
+                <p className="hint">No reference uploaded for {VOICE_LABELS[voice]}.</p>
+              )}
+            </div>
+          )}
           <div className={`video-frame ${mode === 'recording' ? 'recording' : ''}`}>
             {mode === 'reviewing' && reviewUrl ? (
               <video src={reviewUrl} controls autoPlay />

@@ -1,5 +1,6 @@
 import path from 'path'
 import {
+  DEFAULT_AV_OFFSET_SEC,
   ExportProgress,
   ExportResult,
   OffsetResult,
@@ -163,7 +164,7 @@ export async function exportVideo(onProgress: (p: ExportProgress) => void): Prom
     offsets,
     originalPath,
     outPath,
-    avOffsetSec: data.avOffsetSec ?? 0,
+    avOffsetSec: data.avOffsetSec ?? DEFAULT_AV_OFFSET_SEC,
     cellSize: CELL_SIZE,
     windowStartSec: 0,
     durationSec: originalInfo.durationSec,
@@ -210,7 +211,7 @@ export async function renderSyncPreview(
     offsets,
     originalPath,
     outPath: path.join(dir, relPath),
-    avOffsetSec: data.avOffsetSec ?? 0,
+    avOffsetSec: data.avOffsetSec ?? DEFAULT_AV_OFFSET_SEC,
     cellSize: PREVIEW_CELL_SIZE,
     windowStartSec: start,
     durationSec: duration,

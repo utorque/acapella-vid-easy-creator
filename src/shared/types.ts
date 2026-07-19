@@ -34,6 +34,12 @@ export interface CountInSettings {
   durationSec: number
 }
 
+/** Default manual A/V sync trim: typical webcam capture latency. */
+export const DEFAULT_AV_OFFSET_SEC = 0.07
+
+/** Default share of the per-voice reference audible in the recording monitor. */
+export const DEFAULT_VOICE_MONITOR_RATIO = 0.25
+
 export interface TakeInfo {
   voice: VoicePart
   /** Path relative to the project folder, e.g. "takes/tenor.webm". */
@@ -67,6 +73,11 @@ export interface ProjectData {
   pickupAudio: string | null
   countIn: CountInSettings | null
   takes: Partial<Record<VoicePart, TakeInfo>>
+  /**
+   * Optional per-voice reference tracks (relative paths), same length as
+   * `originalAudio`, used to show a synced waveform while recording that voice.
+   */
+  voiceAudio: Partial<Record<VoicePart, string>>
   crop: CropRect | null
   quadrantMapping: Record<Quadrant, VoicePart>
   /**

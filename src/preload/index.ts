@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type {
   AudioInfo,
   CountInSettings,
@@ -18,6 +18,13 @@ const api = {
   openProjectPath: (dir: string): Promise<ProjectHandle> =>
     ipcRenderer.invoke('project:openPath', dir),
   importAudio: (): Promise<ProjectData | null> => ipcRenderer.invoke('project:importAudio'),
+  importVoiceAudioDialog: (): Promise<ProjectData | null> =>
+    ipcRenderer.invoke('project:importVoiceAudioDialog'),
+  importVoiceAudioPaths: (paths: string[]): Promise<ProjectData> =>
+    ipcRenderer.invoke('project:importVoiceAudioPaths', paths),
+  deleteVoiceAudio: (voice: VoicePart): Promise<ProjectData> =>
+    ipcRenderer.invoke('project:deleteVoiceAudio', voice),
+  getPathForFile: (file: File): string => webUtils.getPathForFile(file),
   readProjectFile: (relPath: string): Promise<Uint8Array> =>
     ipcRenderer.invoke('project:readFile', relPath),
   acceptCountIn: (wav: Uint8Array, settings: CountInSettings): Promise<ProjectData> =>

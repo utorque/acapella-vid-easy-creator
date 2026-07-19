@@ -16,6 +16,23 @@ const PROJECT_FILE = 'project.json'
 let currentDir: string | null = null
 let currentData: ProjectData | null = null
 
+const VOICE_FILENAME_PATTERNS: [VoicePart, RegExp][] = [
+  ['tenor', /ten/i],
+  ['lead', /lead/i],
+  ['baritone', /bari/i],
+  ['bass', /bass/i]
+]
+
+/** Match a dropped/selected file name to a voice part, e.g. "02-Bari.wav" -> "baritone". */
+export function detectVoicePart(fileName: string): VoicePart | null {
+  for (const [voice, pattern] of VOICE_FILENAME_PATTERNS) {
+    if (pattern.test(fileName)) return voice
+  }
+  return null
+}
+
+const VOICE_DURATION_TOLERANCE_SEC = 0.35
+
 export function getCurrent(): { dir: string; data: ProjectData } {
   if (!currentDir || !currentData) throw new Error('No project is open')
   return { dir: currentDir, data: currentData }
@@ -54,6 +71,7 @@ export async function createProject(parentDir: string, name: string): Promise<{ 
     pickupAudio: null,
     countIn: null,
     takes: {},
+    voiceAudio: {},
     crop: null,
     quadrantMapping: { ...DEFAULT_QUADRANT_MAPPING }
   }
@@ -67,6 +85,7 @@ export async function openProject(dir: string): Promise<{ dir: string; data: Pro
   const raw = await fs.readFile(path.join(dir, PROJECT_FILE), 'utf8')
   const data = JSON.parse(raw) as ProjectData
   if (data.version !== 1) throw new Error(`Unsupported project version: ${data.version}`)
+  if (!data.voiceAudio) data.voiceAudio = {}
   currentDir = dir
   currentData = data
   return { dir, data }
@@ -88,7 +107,74 @@ export async function importAudio(sourcePath: string): Promise<ProjectData> {
     data.pickupAudio = null
     data.countIn = null
   }
+  // A new original may no longer match the length of any uploaded voice references.
+  for (const rel of Object.values(data.voiceAudio)) {
+    if (rel) await fs.rm(path.join(dir, rel), { force: true })
+  }
+  data.voiceAudio = {}
   await save()
+  return data
+}
+
+/**
+ * Import one or more per-voice reference tracks. Each file name must contain
+ * "ten"/"lead"/"bari"/"bass" to identify its voice part, and its duration must
+ * match the imported mixed track within a small tolerance. Validated
+ * all-or-nothing before anything is copied.
+ */
+export async function importVoiceAudioFiles(paths: string[]): Promise<ProjectData> {
+  const { dir, data } = getCurrent()
+  if (!data.originalAudio) {
+    throw new Error('Import the mixed track before adding per-voice reference audio')
+  }
+  const refDuration = (await probeMedia(path.join(dir, data.originalAudio))).durationSec
+
+  const assignments: { voice: VoicePart; sourcePath: string; ext: string }[] = []
+  const seen = new Set<VoicePart>()
+  for (const sourcePath of paths) {
+    const base = path.basename(sourcePath)
+    const voice = detectVoicePart(base)
+    if (!voice) {
+      throw new Error(
+        `Could not tell which voice part "${base}" belongs to — name it with "ten", "lead", ` +
+          '"bari" or "bass".'
+      )
+    }
+    if (seen.has(voice)) {
+      throw new Error(`Two of the selected files matched ${voice} — drop one file per voice.`)
+    }
+    seen.add(voice)
+    const info = await probeMedia(sourcePath)
+    if (Math.abs(info.durationSec - refDuration) > VOICE_DURATION_TOLERANCE_SEC) {
+      throw new Error(
+        `"${base}" is ${info.durationSec.toFixed(2)}s long but the mixed track is ` +
+          `${refDuration.toFixed(2)}s — they must be the same length.`
+      )
+    }
+    assignments.push({ voice, sourcePath, ext: path.extname(sourcePath).toLowerCase() || '.audio' })
+  }
+
+  for (const { voice, sourcePath, ext } of assignments) {
+    const rel = path.posix.join('audio', `voice-${voice}${ext}`)
+    const existing = data.voiceAudio[voice]
+    if (existing && existing !== rel) {
+      await fs.rm(path.join(dir, existing), { force: true })
+    }
+    await fs.copyFile(sourcePath, path.join(dir, rel))
+    data.voiceAudio[voice] = rel
+  }
+  await save()
+  return data
+}
+
+export async function deleteVoiceAudio(voice: VoicePart): Promise<ProjectData> {
+  const { dir, data } = getCurrent()
+  const rel = data.voiceAudio[voice]
+  if (rel) {
+    await fs.rm(path.join(dir, rel), { force: true })
+    delete data.voiceAudio[voice]
+    await save()
+  }
   return data
 }
 
