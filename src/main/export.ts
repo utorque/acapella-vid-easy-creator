@@ -11,6 +11,7 @@ import {
 import { canCopyToMp4, decodePcm, probeMedia, runFfmpegWithProgress } from './ffmpeg'
 import { findOffset } from './audio-analysis'
 import { getCurrent } from './project'
+import { colorFilterFragment } from './colorFilter'
 
 const ANALYSIS_RATE = 8000
 const CELL_SIZE = 540
@@ -28,7 +29,7 @@ function analysisKey(dir: string): string {
   return `${dir}::${data.pickupAudio}::${data.countIn?.durationSec}::${takes}`
 }
 
-function requireReady(): { dir: string; voices: VoicePart[] } {
+export function requireReady(): { dir: string; voices: VoicePart[] } {
   const { dir, data } = getCurrent()
   if (!data.originalAudio) throw new Error('No mixed track imported')
   if (!data.pickupAudio || !data.countIn) throw new Error('Generate the count-in first')
@@ -41,7 +42,12 @@ function requireReady(): { dir: string; voices: VoicePart[] } {
   return { dir, voices }
 }
 
-async function detectOffsets(
+/**
+ * Detect (and cache) per-take guide offsets. Shared by export, sync preview,
+ * and color analysis so all three agree on exactly where each take's
+ * "singing starts" moment is.
+ */
+export async function detectOffsets(
   onProgress: (p: ExportProgress) => void
 ): Promise<OffsetResult[]> {
   const { dir, data } = getCurrent()
@@ -101,21 +107,33 @@ function buildGridArgs(opts: {
   const { dir, data } = getCurrent()
   const { x, y, size } = data.crop!
   const args: string[] = []
-  for (const off of opts.offsets) {
+  // -ss before -i: trim each take so singing (plus the manual A/V trim and
+  // the preview window position) starts at t=0. Also the time origin the
+  // color-correction curve (stored in each take's own file time) is shifted
+  // against below.
+  const trims = opts.offsets.map((off) =>
+    Math.max(0, off.singingStartSec + opts.avOffsetSec + opts.windowStartSec)
+  )
+  opts.offsets.forEach((off, i) => {
     const take = data.takes[off.voice]!
-    // -ss before -i: trim each take so singing (plus the manual A/V trim and
-    // the preview window position) starts at t=0.
-    const trim = Math.max(0, off.singingStartSec + opts.avOffsetSec + opts.windowStartSec)
-    args.push('-ss', trim.toFixed(3), '-i', path.join(dir, take.file))
-  }
+    args.push('-ss', trims[i].toFixed(3), '-i', path.join(dir, take.file))
+  })
   args.push('-i', opts.originalPath)
 
   const cell = opts.cellSize
   const cellFilters = opts.offsets
-    .map(
-      (_off, i) =>
-        `[${i}:v]crop=${size}:${size}:${x}:${y},scale=${cell}:${cell},setsar=1,fps=30[c${i}]`
-    )
+    .map((off, i) => {
+      const chain = [
+        `crop=${size}:${size}:${x}:${y}`,
+        colorFilterFragment(data, off.voice, trims[i]),
+        `scale=${cell}:${cell}`,
+        'setsar=1',
+        'fps=30'
+      ]
+        .filter(Boolean)
+        .join(',')
+      return `[${i}:v]${chain}[c${i}]`
+    })
     .join(';')
   const layout = `0_0|${cell}_0|0_${cell}|${cell}_${cell}`
   let filter = `${cellFilters};[c0][c1][c2][c3]xstack=inputs=4:layout=${layout}[grid]`

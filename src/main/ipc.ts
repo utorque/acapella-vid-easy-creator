@@ -1,8 +1,9 @@
 import { BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import path from 'path'
-import { CountInSettings, CropRect, ProjectData, VoicePart } from '@shared/types'
+import { ColorCorrection, CountInSettings, CropRect, ProjectData, VoicePart } from '@shared/types'
 import * as project from './project'
 import { exportVideo, renderSyncPreview } from './export'
+import { analyzeColor, applyColorCorrection, skipColorCorrection } from './color'
 
 function windowOf(event: Electron.IpcMainInvokeEvent): BrowserWindow | null {
   return BrowserWindow.fromWebContents(event.sender)
@@ -135,6 +136,21 @@ export function registerIpcHandlers(): void {
       )
     }
   )
+
+  ipcMain.handle('project:colorAnalyze', async (event) => {
+    const win = windowOf(event)
+    return analyzeColor((p) => {
+      win?.webContents.send('color:progress', p)
+    })
+  })
+
+  ipcMain.handle('project:colorApply', async (_event, correction: ColorCorrection) => {
+    return applyColorCorrection(correction)
+  })
+
+  ipcMain.handle('project:colorSkip', async () => {
+    return skipColorCorrection()
+  })
 
   ipcMain.handle('shell:showItem', async (_event, filePath: string) => {
     shell.showItemInFolder(filePath)

@@ -4,9 +4,10 @@ import ProjectStage from './stages/ProjectStage'
 import PickupStage from './stages/PickupStage'
 import CaptureStage from './stages/CaptureStage'
 import CropStage from './stages/CropStage'
+import ColorStage from './stages/ColorStage'
 import ExportStage from './stages/ExportStage'
 
-export type StageId = 'project' | 'pickup' | 'capture' | 'crop' | 'export'
+export type StageId = 'project' | 'pickup' | 'capture' | 'crop' | 'color' | 'export'
 
 interface StageDef {
   id: StageId
@@ -47,11 +48,19 @@ const STAGES: StageDef[] = [
     hint: 'Record at least one take first'
   },
   {
-    id: 'export',
-    label: '5 · Export',
+    id: 'color',
+    label: '5 · Color',
     enabled: (d) => !!d && !!d.crop && VOICE_PARTS.every((v) => !!d.takes[v]),
-    done: () => false,
+    done: (d) => !!d?.colorCorrection,
     hint: 'Record all four parts and set the crop first'
+  },
+  {
+    id: 'export',
+    label: '6 · Export',
+    enabled: (d) =>
+      !!d && !!d.crop && VOICE_PARTS.every((v) => !!d.takes[v]) && !!d.colorCorrection,
+    done: () => false,
+    hint: 'Finish the color consistency step first'
   }
 ]
 
@@ -106,6 +115,7 @@ export default function App(): React.JSX.Element {
         {stage === 'pickup' && data && <PickupStage data={data} onData={setData} />}
         {stage === 'capture' && data && <CaptureStage data={data} onData={setData} />}
         {stage === 'crop' && data && <CropStage data={data} onData={setData} />}
+        {stage === 'color' && data && <ColorStage data={data} onData={setData} />}
         {stage === 'export' && data && <ExportStage data={data} onData={setData} />}
         {showNext && (
           <button className="next-fab" onClick={() => setStage(next.id)}>
